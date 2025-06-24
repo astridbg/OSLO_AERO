@@ -422,7 +422,8 @@ contains
          t     => state%t,                 &
          qc    => state%q(:pcols,:pver,cldliq_idx), &
          nc    => state%q(:pcols,:pver,numliq_idx), &
-         pmid  => state%pmid               )
+         pmid  => state%pmid               &
+         lat   => state%lat) ! astridbg added lat
 
     itim_old = pbuf_old_tim_idx()
     call pbuf_get_field(pbuf, ast_idx, ast, start=(/1,1,itim_old/), kount=(/pcols,pver,1/))
@@ -562,30 +563,37 @@ contains
        do k = top_lev, pver
 
           if (t(i,k) > 235.15_r8 .and. t(i,k) < 269.15_r8) then
-             qcic = min(qc(i,k)/lcldm(i,k), 5.e-3_r8)
-             ncic = max(nc(i,k)/lcldm(i,k), 0._r8)
+             if (lat(i)*180._r8/pi > 66._r8) then ! astridbg added extra lat-based if statement
+               frzimm(i,k) = 1.e-3_r8*exp(-0.342_r8*(t(i,k)-273.15_r8) - 10.105_r8)/deltatin ! units [cm-3 s-1]
+               frzcnt(i,k) = 0._r8
+               frzdep(i,k) = 0._r8
+             else
+               qcic = min(qc(i,k)/lcldm(i,k), 5.e-3_r8)
+               ncic = max(nc(i,k)/lcldm(i,k), 0._r8)
 
-             con1 = 1._r8/(1.333_r8*pi)**0.333_r8
-             r3lx = con1*(rho(i,k)*qcic/(rhoh2o*max(ncic*rho(i,k), 1.0e6_r8)))**0.333_r8 ! in m
-             r3lx = max(4.e-6_r8, r3lx)
-             supersatice = svp_water(t(i,k))/svp_ice(t(i,k))
-             fn(1) = factnum(i,k,MODE_IDX_OMBC_INTMIX_COAT_AIT)  ! bc accumulation mode
-             fn(2) = factnum(i,k,MODE_IDX_DST_A2)                ! dust_a1 accumulation mode
-             fn(3) = factnum(i,k,MODE_IDX_DST_A3)                ! dust_a3 coarse mode
+               con1 = 1._r8/(1.333_r8*pi)**0.333_r8
+               r3lx = con1*(rho(i,k)*qcic/(rhoh2o*max(ncic*rho(i,k), 1.0e6_r8)))**0.333_r8 ! in m
+               r3lx = max(4.e-6_r8, r3lx)
+               supersatice = svp_water(t(i,k))/svp_ice(t(i,k))
+               fn(1) = factnum(i,k,MODE_IDX_OMBC_INTMIX_COAT_AIT)  ! bc accumulation mode
+               fn(2) = factnum(i,k,MODE_IDX_DST_A2)                ! dust_a1 accumulation mode
+               fn(3) = factnum(i,k,MODE_IDX_DST_A3)                ! dust_a3 coarse mode
 
-             call hetfrz_classnuc_calc( &
-                  deltatin,  t(i,k),  pmid(i,k),  supersatice,   &
-                  fn,  r3lx,  ncic*rho(i,k)*1.0e-6_r8,  frzbcimm(i,k),  frzduimm(i,k),   &
-                  frzbccnt(i,k),  frzducnt(i,k),  frzbcdep(i,k),  frzdudep(i,k),  hetraer(i,k,:), &
-                  awcam(i,k,:), awfacm(i,k,:), dstcoat(i,k,:), total_aer_num_scaled(i,k,:),  &
-                  coated_aer_num_scaled(i,k,:), uncoated_aer_num_scaled(i,k,:), total_interstitial_aer_num_scaled(i,k,:), &
-                  total_cloudborne_aer_num_scaled(i,k,:), errstring)
+               call hetfrz_classnuc_calc( &
+                     deltatin,  t(i,k),  pmid(i,k),  supersatice,   &
+                     fn,  r3lx,  ncic*rho(i,k)*1.0e-6_r8,  frzbcimm(i,k),  frzduimm(i,k),   &
+                     frzbccnt(i,k),  frzducnt(i,k),  frzbcdep(i,k),  frzdudep(i,k),  hetraer(i,k,:), &
+                     awcam(i,k,:), awfacm(i,k,:), dstcoat(i,k,:), total_aer_num_scaled(i,k,:),  &
+                     coated_aer_num_scaled(i,k,:), uncoated_aer_num_scaled(i,k,:), total_interstitial_aer_num_scaled(i,k,:), &
+                     total_cloudborne_aer_num_scaled(i,k,:), errstring)
 
-             call handle_errmsg(errstring, subname="hetfrz_classnuc_calc")
+               call handle_errmsg(errstring, subname="hetfrz_classnuc_calc")
 
-             frzimm(i,k) = frzbcimm(i,k) + frzduimm(i,k)
-             frzcnt(i,k) = frzbccnt(i,k) + frzducnt(i,k)
-             frzdep(i,k) = frzbcdep(i,k) + frzdudep(i,k)
+               frzimm(i,k) = frzbcimm(i,k) + frzduimm(i,k)
+               frzcnt(i,k) = frzbccnt(i,k) + frzducnt(i,k)
+               frzdep(i,k) = frzbcdep(i,k) + frzdudep(i,k)
+             
+             end if 
 
              if (frzimm(i,k) > 0._r8) freqimm(i,k) = 1._r8
              if (frzcnt(i,k) > 0._r8) freqcnt(i,k) = 1._r8
