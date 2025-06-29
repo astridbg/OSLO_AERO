@@ -422,7 +422,7 @@ contains
          t     => state%t,                 &
          qc    => state%q(:pcols,:pver,cldliq_idx), &
          nc    => state%q(:pcols,:pver,numliq_idx), &
-         pmid  => state%pmid               &
+         pmid  => state%pmid,               &
          lat   => state%lat) ! astridbg added lat
 
     itim_old = pbuf_old_tim_idx()
